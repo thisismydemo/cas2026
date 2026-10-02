@@ -1,0 +1,12 @@
+// IIC Hybrid Orders correlation drill-down: every stage record of the last 30 minutes, grouped by order.
+Cas26Service_CL
+| where TimeGenerated > ago(30m)
+| extend CorrelationId=tostring(iff(isempty(column_ifexists('CorrelationId','')), column_ifexists('RequestId',''), column_ifexists('CorrelationId',''))),
+         Cloud=tostring(column_ifexists('Cloud', '')),
+         Component=tostring(iff(isempty(column_ifexists('Component','')), column_ifexists('Computer',''), column_ifexists('Component',''))),
+         Stage=tostring(column_ifexists('Stage', '')),
+         Environment=tostring(column_ifexists('Environment', '')),
+         FailureMode=tostring(column_ifexists('FailureMode', ''))
+| where isnotempty(CorrelationId)
+| project TimeGenerated, CorrelationId, Environment, Cloud, Component, Stage, Success, DurationMs, FailureMode, Message
+| order by CorrelationId asc, TimeGenerated asc

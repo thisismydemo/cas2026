@@ -1,0 +1,5 @@
+# Terraform template: one actual worker; no whole-estate dilution.
+100 * (1 - (
+ sum(rate({"system.cpu.time", "Microsoft.resourceid"=${worker_resource_id_json}, state="idle"}[15m])) /
+ sum(rate({"system.cpu.time", "Microsoft.resourceid"=${worker_resource_id_json}}[15m]))
+))

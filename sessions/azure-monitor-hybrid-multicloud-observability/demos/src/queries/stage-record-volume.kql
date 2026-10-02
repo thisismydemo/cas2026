@@ -1,0 +1,7 @@
+// Stage-record volume: what the order evidence costs per order, so a reduction can be weighed against the question it answers.
+// _BilledSize is bytes per record; Rows per order should be about seven for a completed IIC order.
+Cas26Service_CL
+| where TimeGenerated > ago(1d)
+| summarize Rows = count(), BilledBytes = sum(_BilledSize), Orders = dcount(CorrelationId)
+    by Environment, DemoTag
+| extend RowsPerOrder = round(todouble(Rows) / Orders, 1), BilledMB = round(BilledBytes / 1000000.0, 3), BytesPerOrder = round(todouble(BilledBytes) / Orders, 0)

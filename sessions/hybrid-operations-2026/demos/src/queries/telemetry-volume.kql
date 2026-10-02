@@ -1,0 +1,7 @@
+// Log Analytics Usage aggregates ingestion quantities in Mbytes; not an invoice.
+// Workspace-wide context: this is not per-machine or Arc-only attribution.
+Usage
+| where TimeGenerated > ago(30d)
+| where IsBillable == true and QuantityUnit == 'Mbytes'
+| summarize BillableMbytes=sum(Quantity) by DataType
+| order by BillableMbytes desc

@@ -1,0 +1,7 @@
+// Build verification: rsyslog/imfile -> AMA -> DCR for the CAS26 worker process.
+Syslog
+| where TimeGenerated > ago(30m)
+| where Computer startswith 'cas26-'
+| where ProcessName == 'cas26-worker'
+| project TimeGenerated, Computer, SeverityLevel, SyslogMessage
+| order by TimeGenerated desc

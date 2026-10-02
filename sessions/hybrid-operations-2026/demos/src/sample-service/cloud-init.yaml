@@ -1,0 +1,63 @@
+#cloud-config
+# CAS26 request service guest configuration for Ubuntu 24.04.
+# Shared by the Azure endpoint VM, the AWS EC2 guest and the on-premises worker.
+# Tokens are replaced by Terraform (modules/endpoint, modules/aws) or New-Cas26LabVm.ps1:
+#   __HOSTNAME__        guest hostname (cas26-ep01, cas26-aws01, cas26-lnx01)
+#   __ROLE__            endpoint or worker (description only)
+#   __PORT__            service port
+#   __WORKER_URL_LINE__ "Environment=CAS26_WORKER_URL=http://host:port" for the endpoint, empty for workers
+#   __SYSLOG_TAG__      rsyslog tag; queries filter on cas26-worker
+#   Server source token: contents of server.mjs, indented six spaces in write_files
+hostname: __HOSTNAME__
+preserve_hostname: false
+manage_etc_hosts: true
+package_update: true
+packages:
+  - rsyslog
+  - ca-certificates
+  - curl
+  - gnupg
+write_files:
+  - path: /opt/cas26/server.mjs
+    owner: root:root
+    permissions: '0644'
+    content: |
+      __SERVER_MJS__
+  - path: /etc/systemd/system/cas26-service.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=CAS26 request service (__ROLE__)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Environment=CAS26_PORT=__PORT__
+      Environment=CAS26_BIND=0.0.0.0
+      Environment=CAS26_LOG_PATH=/var/log/cas26/service.jsonl
+      Environment=CAS26_WORKER_STATE=/var/lib/cas26/worker-state.json
+      __WORKER_URL_LINE__
+      ExecStart=/usr/bin/node /opt/cas26/server.mjs
+      Restart=always
+      RestartSec=3
+      User=cas26
+      Group=cas26
+      WorkingDirectory=/opt/cas26
+
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/rsyslog.d/40-cas26.conf
+    owner: root:root
+    permissions: '0644'
+    content: |
+      module(load="imfile")
+      input(type="imfile" File="/var/log/cas26/service.jsonl" Tag="__SYSLOG_TAG__:" Severity="info" Facility="local0")
+runcmd:
+  - [ sh, -c, 'curl -fsSL https://deb.nodesource.com/setup_24.x | bash -' ]
+  - [ apt-get, install, -y, nodejs ]
+  - [ sh, -c, 'id cas26 >/dev/null 2>&1 || useradd --system --home-dir /opt/cas26 --shell /usr/sbin/nologin cas26' ]
+  - [ sh, -c, 'mkdir -p /var/log/cas26 /var/lib/cas26 && touch /var/log/cas26/service.jsonl && chown -R cas26:cas26 /var/log/cas26 /var/lib/cas26 && chmod 755 /var/log/cas26 /var/lib/cas26 && chmod 644 /var/log/cas26/service.jsonl' ]
+  - [ systemctl, daemon-reload ]
+  - [ systemctl, enable, --now, cas26-service ]
+  - [ systemctl, restart, rsyslog ]

@@ -1,0 +1,7 @@
+// Build verification: are guest processor counters landing for the CAS26 machines?
+Perf
+| where TimeGenerated > ago(30m)
+| where Computer startswith 'cas26-'
+| where CounterName == '% Processor Time' and InstanceName == '_Total'
+| summarize CpuPercent=avg(CounterValue) by Computer, bin(TimeGenerated, 1m)
+| render timechart

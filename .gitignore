@@ -1,0 +1,54 @@
+# CAS26 repository ignore rules. This repository is public; anything below stays on the presenter's machine.
+
+# --- Local-only folders (planning, reference material, working state) ---
+/pmo/
+/tmp/
+/.artifacts/
+/.ai/
+/.azure/
+/.claude/
+/.github/
+/shared/TPLABS/
+/shared/presentation/
+
+# --- Lab website: raw build data (the published site in lab/site/ is cleaned and committed) ---
+/shared/foundation/site/src/generated-data.json
+/shared/foundation/site/src/resource-register.json
+
+# --- Private configuration, credentials and deployment bindings ---
+**/.env
+**/.env.*
+!**/.env.example
+**/config/variables.yml
+**/config/variables.local.json
+shared/foundation/config/deployment.local.json
+**/infra-state.local.json
+**/demos/config/demo.local.json
+**/demos/evidence/local/
+**/private-evidence/
+**/*running-config-private*.conf
+
+# --- Terraform state, plans, variables and backends ---
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+**/*.tfvars.json
+**/*.backend.hcl
+shared/foundation/terraform/backend.hcl
+**/.terraform/
+
+# --- Tooling caches ---
+node_modules/
+__pycache__/
+*.pyc
+
+# --- Editor and application temporary files ---
+# PowerPoint lock files
+~$*.pptx
+# Personal Claude Code overrides (permission rules)
+.claude/settings.local.json
+
+# --- Lab documentation (kept locally, not published) ---
+/lab/

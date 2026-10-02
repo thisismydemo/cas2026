@@ -1,0 +1,759 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "name": "intro",
+      "content": {
+        "json": "# IIC Hybrid Orders — 360 service operations\nOne customer outcome, three execution planes: **Azure** (Front Door, coordinator, Service Bus), **on-premises** (validation worker on the SCVMM/SDN cluster) and **AWS** (fulfillment worker, EKS portal). The Health Model decides health; this workbook explains it. Faults (`deep-thought`, `marvin`, `vogon`) apply to demo-tagged orders only."
+      }
+    },
+    {
+      "type": 9,
+      "name": "parameters",
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "t1",
+            "version": "KqlParameterItem/1.0",
+            "name": "TimeRange",
+            "label": "Time range",
+            "type": 4,
+            "isRequired": true,
+            "value": {
+              "durationMs": 3600000
+            },
+            "typeSettings": {
+              "selectableValues": [
+                {
+                  "durationMs": 900000
+                },
+                {
+                  "durationMs": 3600000
+                },
+                {
+                  "durationMs": 14400000
+                },
+                {
+                  "durationMs": 43200000
+                },
+                {
+                  "durationMs": 86400000
+                },
+                {
+                  "durationMs": 259200000
+                },
+                {
+                  "durationMs": 604800000
+                }
+              ],
+              "allowCustom": true
+            }
+          },
+          {
+            "id": "e1",
+            "version": "KqlParameterItem/1.0",
+            "name": "Environment",
+            "type": 2,
+            "isRequired": true,
+            "value": "Production",
+            "typeSettings": {
+              "additionalResourceOptions": [],
+              "showDefault": false
+            },
+            "jsonData": "[\"Production\",\"Development\"]"
+          },
+          {
+            "id": "c1",
+            "version": "KqlParameterItem/1.0",
+            "name": "CorrelationId",
+            "label": "Correlation ID (optional)",
+            "type": 1,
+            "value": "",
+            "timeContext": {
+              "durationMs": 86400000
+            }
+          }
+        ],
+        "style": "pills",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces"
+      }
+    },
+    {
+      "type": 11,
+      "name": "tabs",
+      "content": {
+        "version": "LinkItem/1.0",
+        "style": "tabs",
+        "links": [
+          {
+            "id": "tab0",
+            "cellValue": "Tab",
+            "linkTarget": "parameter",
+            "linkLabel": "Overview",
+            "subTarget": "Overview",
+            "style": "link"
+          },
+          {
+            "id": "tab1",
+            "cellValue": "Tab",
+            "linkTarget": "parameter",
+            "linkLabel": "Order journey",
+            "subTarget": "Order journey",
+            "style": "link"
+          },
+          {
+            "id": "tab2",
+            "cellValue": "Tab",
+            "linkTarget": "parameter",
+            "linkLabel": "Clouds and components",
+            "subTarget": "Clouds and components",
+            "style": "link"
+          },
+          {
+            "id": "tab3",
+            "cellValue": "Tab",
+            "linkTarget": "parameter",
+            "linkLabel": "Infrastructure",
+            "subTarget": "Infrastructure",
+            "style": "link"
+          },
+          {
+            "id": "tab4",
+            "cellValue": "Tab",
+            "linkTarget": "parameter",
+            "linkLabel": "Telemetry",
+            "subTarget": "Telemetry",
+            "style": "link"
+          }
+        ]
+      }
+    },
+    {
+      "type": 3,
+      "name": "kpis",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Cas26Service_CL\n| where TimeGenerated {TimeRange}\n| where Environment == '{Environment}'\n| where Component == 'Coordinator' and Stage in ('Completed','Failed','TimedOut')\n| summarize Orders = count(), Completed = countif(Stage == 'Completed' and Success), Failed = countif(Stage == 'Failed'),\n            TimedOut = countif(Stage == 'TimedOut'), P95Ms = percentile(iff(Stage == 'Completed', DurationMs, long(null)), 95)\n| extend SuccessPercent = round(100.0 * Completed / iff(Orders == 0, 1, Orders), 1)\n| project Orders, SuccessPercent, Completed, Failed, TimedOut, P95Seconds = round(P95Ms / 1000.0, 1)",
+        "size": 0,
+        "title": "Order outcome",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "${logs_workspace_id}"
+        ],
+        "visualization": "tiles",
+        "tileSettings": {
+          "showBorder": true,
+          "titleContent": {
+            "columnMatch": "Orders"
+          }
+        }
+      },
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Overview"
+      }
+    },
+    {
+      "type": 3,
+      "name": "outcomesOverTime",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Cas26Service_CL\n| where TimeGenerated {TimeRange}\n| where Environment == '{Environment}'\n| where Component == 'Coordinator' and Stage in ('Completed','Failed','TimedOut')\n| summarize count() by Stage, bin(TimeGenerated, {TimeRange:grain})",
+        "size": 0,
+        "title": "Orders by outcome",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "${logs_workspace_id}"
+        ],
+        "visualization": "barchart"
+      },
+      "customWidth": "60",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Overview"
+      }
+    },
+    {
+      "type": 3,
+      "name": "failuresByComponent",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Cas26Service_CL\n| where TimeGenerated {TimeRange}\n| where Environment == '{Environment}'\n| where Success == false\n| summarize Failures = count(), LastSeen = max(TimeGenerated) by Cloud, Component, Stage, FailureMode = iff(isempty(FailureMode), '(none)', FailureMode)\n| order by Failures desc",
+        "size": 0,
+        "title": "What failed — by component and fault",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "${logs_workspace_id}"
+        ],
+        "visualization": "table"
+      },
+      "customWidth": "40",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Overview"
+      }
+    },
+    {
+      "type": 3,
+      "name": "latencyByCloud",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Cas26Service_CL\n| where TimeGenerated {TimeRange}\n| where Environment == '{Environment}'\n| where Stage in ('Completed','Failed') and Component != 'Coordinator'\n| summarize P95 = percentile(DurationMs, 95) by Plane = strcat(Cloud, ' · ', Component), bin(TimeGenerated, {TimeRange:grain})",
+        "size": 0,
+        "title": "Stage duration by execution plane (p95, ms)",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "${logs_workspace_id}"
+        ],
+        "visualization": "timechart"
+      },
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Overview"
+      }
+    },
+    {
+      "type": 3,
+      "name": "recentOrders",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Cas26Service_CL\n| where TimeGenerated {TimeRange}\n| where Environment == '{Environment}'\n| where Component == 'Coordinator'\n| summarize Placed = min(TimeGenerated), Final = anyif(Stage, Stage in ('Completed','Failed','TimedOut')),\n            DurationMs = maxif(DurationMs, Stage in ('Completed','Failed','TimedOut')), Origin = anyif(Origin, Stage == 'Accepted'),\n            DemoTag = any(DemoTag) by CorrelationId, OrderNumber\n| join kind=leftouter (Cas26Service_CL\n| where TimeGenerated {TimeRange}\n| where Environment == '{Environment}'\n    | where FailureMode != '' | summarize FailureMode = any(FailureMode) by CorrelationId) on CorrelationId\n| project Placed, OrderNumber, Status = iff(isempty(Final), 'Pending', Final), Seconds = round(DurationMs / 1000.0, 1),\n          FailureMode, DemoTag, Origin, CorrelationId\n| order by Placed desc\n| take 200",
+        "size": 0,
+        "title": "Recent orders (select a row to see its journey)",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "${logs_workspace_id}"
+        ],
+        "visualization": "table",
+        "exportFieldName": "CorrelationId",
+        "exportParameterName": "CorrelationId",
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "Status",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "icons",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "Completed",
+                    "representation": "success",
+                    "text": "{0}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "Pending",
+                    "representation": "pending",
+                    "text": "{0}"
+                  },
+                  {
+                    "operator": "Default",
+                    "representation": "failed",
+                    "text": "{0}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Order journey"
+      }
+    },
+    {
+      "type": 3,
+      "name": "journey",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Cas26Service_CL\n| where TimeGenerated > ago(7d)\n| where CorrelationId == '{CorrelationId}'\n| project TimeGenerated, OrderNumber, Cloud, Component, Stage, Success, DurationMs, FailureMode, Origin, Computer, Message\n| order by TimeGenerated asc",
+        "size": 0,
+        "title": "Order journey — every stage for the selected correlation ID",
+        "timeContext": {
+          "durationMs": 604800000
+        },
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "${logs_workspace_id}"
+        ],
+        "visualization": "table"
+      },
+      "conditionalVisibility": {
+        "parameterName": "CorrelationId",
+        "comparison": "isNotEqualTo",
+        "value": ""
+      }
+    },
+    {
+      "type": 1,
+      "name": "journeyHint",
+      "content": {
+        "json": "_Select an order above (or paste a correlation ID in the filter) to show its full journey across Azure, on-premises and AWS._"
+      }
+    },
+    {
+      "type": 3,
+      "name": "stageCounts",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Cas26Service_CL\n| where TimeGenerated {TimeRange}\n| where Environment == '{Environment}'\n| summarize Results = count(), Failures = countif(Success == false), P50Ms = percentile(DurationMs, 50), P95Ms = percentile(DurationMs, 95)\n          by Cloud, Component, Stage\n| order by Cloud asc, Component asc",
+        "size": 0,
+        "title": "Stage results by plane and component",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "${logs_workspace_id}"
+        ],
+        "visualization": "table"
+      },
+      "customWidth": "60",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Clouds and components"
+      }
+    },
+    {
+      "type": 3,
+      "name": "workerHeartbeat",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Cas26Service_CL\n| where TimeGenerated {TimeRange}\n| where Environment == '{Environment}'\n| where Stage == 'Started'\n| summarize Started = count() by Component, bin(TimeGenerated, 5m)",
+        "size": 0,
+        "title": "Worker activity (orders started per 5 min)",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "${logs_workspace_id}"
+        ],
+        "visualization": "timechart"
+      },
+      "customWidth": "40",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Clouds and components"
+      }
+    },
+    {
+      "type": 10,
+      "name": "afdOrigin",
+      "content": {
+        "version": "MetricsItem/2.0",
+        "size": 0,
+        "chartType": 2,
+        "resourceType": "microsoft.cdn/profiles",
+        "metricScope": 0,
+        "resourceIds": [
+          "${frontdoor_id}"
+        ],
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "metrics": [
+          {
+            "namespace": "microsoft.cdn/profiles",
+            "metric": "microsoft.cdn/profiles--OriginHealthPercentage",
+            "aggregation": 4
+          }
+        ],
+        "title": "Front Door — origin health % (Azure and AWS portal origins)",
+        "gridSettings": {
+          "rowLimit": 10000
+        },
+        "splitBy": [
+          {
+            "dimension": "Origin",
+            "sort": 2,
+            "limit": 10
+          }
+        ]
+      },
+      "customWidth": "50",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Clouds and components"
+      }
+    },
+    {
+      "type": 10,
+      "name": "afdRequests",
+      "content": {
+        "version": "MetricsItem/2.0",
+        "size": 0,
+        "chartType": 2,
+        "resourceType": "microsoft.cdn/profiles",
+        "metricScope": 0,
+        "resourceIds": [
+          "${frontdoor_id}"
+        ],
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "metrics": [
+          {
+            "namespace": "microsoft.cdn/profiles",
+            "metric": "microsoft.cdn/profiles--RequestCount",
+            "aggregation": 1
+          },
+          {
+            "namespace": "microsoft.cdn/profiles",
+            "metric": "microsoft.cdn/profiles--Percentage5XX",
+            "aggregation": 4
+          }
+        ],
+        "title": "Front Door — requests and 5xx %",
+        "gridSettings": {
+          "rowLimit": 10000
+        }
+      },
+      "customWidth": "50",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Clouds and components"
+      }
+    },
+    {
+      "type": 10,
+      "name": "sbBacklog",
+      "content": {
+        "version": "MetricsItem/2.0",
+        "size": 0,
+        "chartType": 2,
+        "resourceType": "microsoft.servicebus/namespaces",
+        "metricScope": 0,
+        "resourceIds": [
+          "${servicebus_id}"
+        ],
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "metrics": [
+          {
+            "namespace": "microsoft.servicebus/namespaces",
+            "metric": "microsoft.servicebus/namespaces--ActiveMessages",
+            "aggregation": 3
+          },
+          {
+            "namespace": "microsoft.servicebus/namespaces",
+            "metric": "microsoft.servicebus/namespaces--DeadletteredMessages",
+            "aggregation": 3
+          }
+        ],
+        "title": "Service Bus — active and dead-lettered messages",
+        "gridSettings": {
+          "rowLimit": 10000
+        },
+        "splitBy": [
+          {
+            "dimension": "EntityName",
+            "sort": 2,
+            "limit": 10
+          }
+        ]
+      },
+      "customWidth": "50",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Clouds and components"
+      }
+    },
+    {
+      "type": 10,
+      "name": "sbThroughput",
+      "content": {
+        "version": "MetricsItem/2.0",
+        "size": 0,
+        "chartType": 2,
+        "resourceType": "microsoft.servicebus/namespaces",
+        "metricScope": 0,
+        "resourceIds": [
+          "${servicebus_id}"
+        ],
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "metrics": [
+          {
+            "namespace": "microsoft.servicebus/namespaces",
+            "metric": "microsoft.servicebus/namespaces--IncomingMessages",
+            "aggregation": 1
+          },
+          {
+            "namespace": "microsoft.servicebus/namespaces",
+            "metric": "microsoft.servicebus/namespaces--OutgoingMessages",
+            "aggregation": 1
+          }
+        ],
+        "title": "Service Bus — incoming and outgoing messages",
+        "gridSettings": {
+          "rowLimit": 10000
+        }
+      },
+      "customWidth": "50",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Clouds and components"
+      }
+    },
+    {
+      "type": 3,
+      "name": "guestCpuPromql",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Infrastructure"
+      },
+      "customWidth": "50",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "100 * (1 - (sum by (\"Microsoft.resourceid\") (rate({\"system.cpu.time\", state=\"idle\"}[15m])) / sum by (\"Microsoft.resourceid\") (rate({\"system.cpu.time\"}[15m]))))",
+        "size": 0,
+        "title": "Supporting compute CPU % — PromQL (Azure Monitor workspace)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 102,
+        "resourceType": "microsoft.monitor/accounts",
+        "resourceIds": [
+          "${metrics_workspace_id}"
+        ],
+        "visualization": "linechart"
+      }
+    },
+    {
+      "type": 3,
+      "name": "guestMemoryPromql",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Infrastructure"
+      },
+      "customWidth": "50",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "sum by (\"Microsoft.resourceid\") ({\"system.memory.usage\", state=\"free\"}) / (1024 * 1024)",
+        "size": 0,
+        "title": "Free memory (MiB) — PromQL (Azure Monitor workspace)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 102,
+        "resourceType": "microsoft.monitor/accounts",
+        "resourceIds": [
+          "${metrics_workspace_id}"
+        ],
+        "visualization": "linechart"
+      }
+    },
+    {
+      "type": 3,
+      "name": "heartbeat",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Heartbeat\n| where TimeGenerated {TimeRange}\n| where Computer startswith 'cas26-' or Computer startswith 'iic-' or Computer startswith 'tplabs-01-' or Computer startswith 'EC2AMAZ' or Computer startswith 'ip-10-61'\n| summarize LastHeartbeat = max(TimeGenerated), Agent = any(Category), OS = any(OSType) by Computer\n| extend MinutesAgo = datetime_diff('minute', now(), LastHeartbeat)\n| extend Location = case(Computer startswith 'iic-' or Computer startswith 'EC2AMAZ', 'AWS (EC2)', Computer startswith 'ip-10-61', 'AWS (EKS node)', 'On-premises')\n| project Location, Computer, OS, MinutesAgo, LastHeartbeat\n| order by Location asc, Computer asc",
+        "size": 0,
+        "title": "Reporting machines — on-premises, AWS and EKS",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "${logs_workspace_id}"
+        ],
+        "visualization": "table",
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "MinutesAgo",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "icons",
+                "thresholdsGrid": [
+                  {
+                    "operator": "<=",
+                    "thresholdValue": "5",
+                    "representation": "success",
+                    "text": "{0} min"
+                  },
+                  {
+                    "operator": "<=",
+                    "thresholdValue": "15",
+                    "representation": "2",
+                    "text": "{0} min"
+                  },
+                  {
+                    "operator": "Default",
+                    "representation": "4",
+                    "text": "{0} min"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "customWidth": "50",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Infrastructure"
+      }
+    },
+    {
+      "type": 3,
+      "name": "vmInsightsCpu",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "InsightsMetrics\n| where TimeGenerated {TimeRange}\n| where Namespace == 'Processor' and Name == 'UtilizationPercentage'\n| summarize CpuPercent = avg(Val) by Computer, bin(TimeGenerated, {TimeRange:grain})",
+        "size": 0,
+        "title": "CPU % by machine — VM insights",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "${logs_workspace_id}"
+        ],
+        "visualization": "timechart"
+      },
+      "customWidth": "50",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Infrastructure"
+      }
+    },
+    {
+      "type": 3,
+      "name": "probe",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Cas26Service_CL\n| where TimeGenerated > ago(10m)\n| where Environment == '{Environment}'\n| summarize Rows = count(), Orders = dcount(CorrelationId), LastRow = max(TimeGenerated) by Cloud, Component\n| extend Coverage = iff(Orders > 0, 'Reporting', 'Missing')\n| order by Cloud asc",
+        "size": 0,
+        "title": "Order-completion evidence and three-plane coverage (last 10 min)",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "${logs_workspace_id}"
+        ],
+        "visualization": "table"
+      },
+      "customWidth": "50",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Telemetry"
+      }
+    },
+    {
+      "type": 3,
+      "name": "probeEvents",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Cas26Service_CL\n| where TimeGenerated {TimeRange}\n| where Environment == '{Environment}'\n| project TimeGenerated, OrderNumber, Cloud, Component, Stage, Success, DurationMs, FailureMode, CorrelationId\n| order by TimeGenerated desc\n| take 100",
+        "size": 0,
+        "title": "Correlated stage records (latest 100)",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "${logs_workspace_id}"
+        ],
+        "visualization": "table"
+      },
+      "customWidth": "50",
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Telemetry"
+      }
+    },
+    {
+      "type": 3,
+      "name": "usage",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Usage\n| where TimeGenerated > ago(8d)\n| where StartTime >= startofday(ago(7d)) and StartTime < startofday(now())\n| where IsBillable == true\n| summarize GB = sum(Quantity) / 1000 by DataType, bin(StartTime, 1d)",
+        "size": 0,
+        "title": "Workspace ingestion by table (GB/day, last 7 days)",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "${logs_workspace_id}"
+        ],
+        "visualization": "barchart"
+      },
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "Telemetry"
+      }
+    }
+  ],
+  "isLocked": false,
+  "fallbackResourceIds": [
+    "${logs_workspace_id}"
+  ]
+}

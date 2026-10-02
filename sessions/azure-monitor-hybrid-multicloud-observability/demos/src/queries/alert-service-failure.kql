@@ -1,0 +1,11 @@
+// Service-centric alert body for the rule "CAS26 service: request failures" (10-minute window, 5-minute
+// frequency, fires when the query returns a row). It fires once for IIC Hybrid Orders when at least three
+// orders reached a final state in the window and half or more failed. Same arithmetic as the Health Model
+// order-failure signal (lab/design/HYBRID-APPLICATION-HEALTH-DESIGN.md).
+Cas26Service_CL
+| where TimeGenerated > ago(10m)
+| where Environment == 'Production' and Component == 'Coordinator' and Stage in ('Completed', 'Failed', 'TimedOut')
+| summarize Samples = count(), Failures = countif(Success == false)
+| where Samples >= 3
+| extend FailurePercent = 100.0 * Failures / Samples
+| where FailurePercent >= 50

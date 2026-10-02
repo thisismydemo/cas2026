@@ -1,0 +1,14 @@
+# Attendee handout review - 2026-09-23
+
+Four editable Markdown sources produce four attendee PDFs: companion, desk playbook, query guide and first-30-days worksheet. They cover the revised storyboard and all ten demo learning outcomes without copying presenter logistics or stale lab deployment claims into attendee material. Existing short companion/playbook were replaced; no deck rebuild was performed.
+
+HCS Foundry reviewed the companion/query guide using DeepSeek V4 Pro (second-opinion) and Grok 4.20 Reasoning (adversary). The main agent verified findings; several proposed corrections were false and were rejected:
+
+- Retained supported AMA/OTel guest monitoring wording: [current tutorial](https://learn.microsoft.com/en-us/azure/azure-monitor/vm/tutorial-enable-monitoring) explicitly describes AMA installation and both metric/log experiences. Did not invent a required separate Metrics Agent. Added the documented distinction between included default guest metrics and additional-cost per-process metrics.
+- Retained `AWS_<AccountId>` for discovered resource placement: [connector deployment documentation](https://learn.microsoft.com/en-us/azure/azure-arc/multicloud-connector/add-public-cloud) specifies PublicCloud_AccountId. The chosen connector-resource RG is not the same thing as discovered-resource placement.
+- Retained `QuantityUnit == 'Mbytes'`: [Usage schema](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/usage) explicitly defines Quantity in Mbytes. The proposed bytes conversion was incorrect.
+- Retained the Flux configuration deletion warning: [Flux tutorial cleanup](https://learn.microsoft.com/en-us/azure/azure-arc/kubernetes/tutorial-use-gitops-flux2) explicitly describes pruning managed objects when deleting the configuration. The shared example includes a namespace.
+- Did not describe Resource Graph PolicyResources as an all-evaluation historical store. Added evaluation-time ordering and clarified multiple initiative definition results; a proposed assignment-only aggregation could hide results.
+- Kept discovery and server onboarding separate in the table and explanatory section. Did not introduce a mandatory manual selection step into automatic connector onboarding.
+
+PDFs were generated from Markdown using ReportLab with embedded fonts and clickable primary references. Every page was rendered with PyMuPDF (Poppler unavailable locally) and visually inspected. Corrected desk-playbook overflow to two pages and preserved worksheet underscore writing lines that Markdown otherwise consumed as emphasis. Final page counts: companion 8, playbook 2, query guide 3, worksheet 3. Checked text extraction, query content, page boundaries and local README links. No query or cloud operation was executed; handouts explicitly state schema/scope prerequisites and distinguish examples from live results.

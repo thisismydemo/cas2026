@@ -1,0 +1,19 @@
+// Health Models signal request-failure-percent (value column FailurePercent). Pair with health-coverage.kql.
+// Telemetry contract (lab/design/HYBRID-APPLICATION-HEALTH-DESIGN.md): Component is Coordinator, Transport,
+// OnPremWorker or AwsWorker. Stage rows are summarized by CorrelationId first, so one order counts once.
+// An order is Completed only when Component=Coordinator, Stage=Completed, Success=true; any Success=false row
+// (a worker failure, a TimedOut or DeadLettered stage) fails it. Orders still in flight are not counted.
+// Fewer than three resolved orders in the window returns no row, so the signal is Unknown, never Healthy.
+Cas26Service_CL
+| where TimeGenerated > ago(5m)
+| extend CorrelationId=tostring(column_ifexists('CorrelationId', '')),
+         Component=tostring(column_ifexists('Component', '')),
+         Stage=tostring(column_ifexists('Stage', ''))
+| where isnotempty(CorrelationId)
+| summarize FailedRows=countif(Success == false),
+            CoordinatorCompleted=countif(Component == 'Coordinator' and Stage == 'Completed' and Success == true)
+    by CorrelationId
+| where FailedRows > 0 or CoordinatorCompleted > 0
+| summarize Samples=count(), Failures=countif(FailedRows > 0)
+| where Samples >= 3
+| project FailurePercent=100.0 * Failures / Samples

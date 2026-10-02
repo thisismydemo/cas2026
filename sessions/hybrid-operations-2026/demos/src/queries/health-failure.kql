@@ -1,0 +1,14 @@
+// Numeric Health Models signal: percentage of recent IIC orders that failed, with a minimum-sample gate.
+// Telemetry contract: lab/design/HYBRID-APPLICATION-HEALTH-DESIGN.md. Component is Coordinator, Transport,
+// OnPremWorker or AwsWorker. An order is complete only on Component == 'Coordinator', Stage == 'Completed',
+// Success == true; any row with Success == false fails it. Orders still in flight are not counted.
+Cas26Service_CL
+| where TimeGenerated > ago(5m)
+| where Customer == 'IIC' and Environment == 'Production'
+| where isnotempty(CorrelationId)
+| summarize Completed=countif(Component == 'Coordinator' and Stage == 'Completed' and Success == true),
+            Failed=countif(Success == false) by CorrelationId
+| where Completed > 0 or Failed > 0
+| summarize Samples=count(), Failures=countif(Failed > 0)
+| where Samples >= 3
+| project FailurePercent=100.0 * Failures / Samples

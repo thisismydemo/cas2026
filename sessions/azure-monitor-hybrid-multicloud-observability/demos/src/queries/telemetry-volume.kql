@@ -1,0 +1,9 @@
+// Telemetry volume: billable ingestion by table (DataType) over the last 30 full days.
+// Usage.Quantity is in MB. This is workspace ingestion, not a complete bill: retention, table plans,
+// Azure Monitor workspace metrics and query charges are separate meters.
+Usage
+| where TimeGenerated > ago(32d)
+| where StartTime >= startofday(ago(30d)) and EndTime < startofday(now())
+| where IsBillable == true
+| summarize BillableGB = round(sum(Quantity) / 1000.0, 3) by DataType
+| order by BillableGB desc

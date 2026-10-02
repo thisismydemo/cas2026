@@ -1,0 +1,5 @@
+# Later Linux setup only. Do not install during local content preparation.
+# Requires rsyslog imfile support. Enable imfile once in the site's rsyslog config.
+module(load="imfile")
+input(type="imfile" File="/var/log/cas26/service.jsonl" Tag="cas26-worker:" Severity="info" Facility="local0")
+# AMA's supported syslog integration receives local0 records under the Linux DCR.

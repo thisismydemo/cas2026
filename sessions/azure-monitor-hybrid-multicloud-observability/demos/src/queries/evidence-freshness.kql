@@ -1,0 +1,28 @@
+// Evidence freshness per source and per stage: when did each route last deliver, and is that inside its expected cadence?
+// Replace <AWS_RESOURCE_GROUP> with the connector-created AWS resource group (for example aws_<AccountId>).
+// ExpectedMaxAgeMin is a presenter-set expectation, not a product default:
+//   Heartbeat 5 (AMA sends one per minute), Perf 5 (per the Linux DCR sample rate), stage records 15
+//   (assumes a synthetic or demo order at least every 15 minutes; change it to your order cadence).
+// Silence is a finding: a source with no row in the window does not appear here at all; compare against the expected list.
+let window = 24h;
+let awsRg = '<AWS_RESOURCE_GROUP>';
+let arcScope = strcat('/resourcegroups/', awsRg, '/providers/microsoft.hybridcompute/machines/');
+union
+    (Heartbeat
+        | where TimeGenerated > ago(window) and _ResourceId contains arcScope
+        | summarize LastSeen = max(TimeGenerated), Rows = count() by Source = strcat('Heartbeat / ', Computer)
+        | extend ExpectedMaxAgeMin = 5),
+    (Perf
+        | where TimeGenerated > ago(window) and _ResourceId contains arcScope
+        | summarize LastSeen = max(TimeGenerated), Rows = count() by Source = strcat('Perf / ', Computer)
+        | extend ExpectedMaxAgeMin = 5),
+    (Cas26Service_CL
+        | where TimeGenerated > ago(window)
+        // column_ifexists keeps the Heartbeat and Perf legs working even if a stage column is missing.
+        | extend Component = tostring(column_ifexists('Component', '')), Stage = tostring(column_ifexists('Stage', ''))
+        | summarize LastSeen = max(TimeGenerated), Rows = count() by Source = strcat('Stage / ', Component, ' / ', Stage)
+        | extend ExpectedMaxAgeMin = 15)
+| extend AgeMin = datetime_diff('minute', now(), LastSeen)
+| extend Freshness = iff(AgeMin <= ExpectedMaxAgeMin, 'Fresh', 'Stale')
+| project Source, LastSeen, AgeMin, ExpectedMaxAgeMin, Freshness, Rows
+| order by Freshness desc, AgeMin desc

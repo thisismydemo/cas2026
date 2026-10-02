@@ -1,0 +1,11 @@
+// Expected CAS26 inventory survives a completely empty Heartbeat result.
+// ${expected_computers_json} is the on-premises and AWS machine list (host names, no domain suffix).
+let expected = print Computers=dynamic(${expected_computers_json})
+| mv-expand Computer=Computers to typeof(string)
+| extend Computer=tolower(tostring(split(Computer, '.')[0]));
+let seen = Heartbeat
+| where TimeGenerated > ago(15m)
+| extend Computer = tolower(tostring(split(Computer, '.')[0]))
+| distinct Computer;
+expected
+| join kind=leftanti seen on Computer

@@ -1,0 +1,7 @@
+// Build verification: is the CAS26 Windows Application-log event path collecting?
+Event
+| where TimeGenerated > ago(30m)
+| where Computer startswith 'cas26-'
+| where Source == 'CAS26Demo'
+| project TimeGenerated, Computer, EventID, RenderedDescription
+| order by TimeGenerated desc

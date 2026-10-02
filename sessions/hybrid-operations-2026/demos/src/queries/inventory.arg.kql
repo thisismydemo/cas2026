@@ -1,0 +1,9 @@
+// Azure Resource Graph Explorer. Replace all three literals; not Log Analytics.
+Resources
+| where subscriptionId =~ 'REPLACE_WITH_SUBSCRIPTION_GUID'
+| where resourceGroup in~ ('REPLACE_WITH_OPERATIONS_RG', 'REPLACE_WITH_AWS_RG')
+| where type in~ ('microsoft.hybridcompute/machines', 'microsoft.kubernetes/connectedclusters')
+| project id, name, type, resourceGroup, location,
+    Owner=tostring(tags.Owner), ArcStatus=tostring(properties.status),
+    ClusterConnectivity=tostring(properties.connectivityStatus)
+| order by resourceGroup asc, name asc

@@ -1,0 +1,28 @@
+// Service outcome per order: summarize the stage rows by CorrelationId FIRST, then judge each order.
+// An order is Completed only when the coordinator wrote Component=Coordinator, Stage=Completed, Success=true.
+// Any row with Success=false fails the order. Anything else is Unresolved (still running, timed out, or evidence missing).
+let window = 30m;
+let lookback = 90m; // wider than window so an order's earlier stages aren't cut off mid-summary
+Cas26Service_CL
+| where TimeGenerated > ago(lookback)
+| where Environment == 'Production'
+| summarize
+    OrderNumber = take_any(OrderNumber),
+    Origin = take_anyif(Origin, Component == 'Coordinator' and Stage == 'Accepted'),
+    FirstSeen = min(TimeGenerated),
+    LastSeen = max(TimeGenerated),
+    CoordinatorCompleted = countif(Component == 'Coordinator' and Stage == 'Completed' and Success == true),
+    FailedRows = countif(Success == false),
+    FailureMode = take_anyif(FailureMode, isnotempty(FailureMode)),
+    FailedComponents = make_set_if(Component, Success == false),
+    Clouds = make_set(Cloud),
+    DemoRows = countif(DemoTag == true)
+    by CorrelationId
+| where FirstSeen > ago(window)
+| extend Outcome = case(FailedRows > 0, 'Failed', CoordinatorCompleted > 0, 'Completed', 'Unresolved')
+| extend ElapsedMs = datetime_diff('millisecond', LastSeen, FirstSeen), DemoTagged = DemoRows > 0
+| project FirstSeen, OrderNumber, CorrelationId, Origin, Outcome, FailureMode, FailedComponents, Clouds, ElapsedMs, DemoTagged
+| order by FirstSeen desc
+// Roll-up for the whole service (append to the query above to replace the per-order list):
+// | summarize Orders = count(), Completed = countif(Outcome == 'Completed'), Failed = countif(Outcome == 'Failed'),
+//             Unresolved = countif(Outcome == 'Unresolved'), LastEvidence = max(FirstSeen)

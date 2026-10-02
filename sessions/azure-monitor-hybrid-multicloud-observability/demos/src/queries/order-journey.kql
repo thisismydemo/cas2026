@@ -1,0 +1,9 @@
+// Order journey: every stage record of ONE order, in time order.
+// Replace <CORRELATION_ID> with the GUID returned by Invoke-Cas26Request.ps1 (CorrelationId), not the OrderNumber.
+// Requires the telemetry-contract columns on Cas26Service_CL (lab/design/HYBRID-APPLICATION-HEALTH-DESIGN.md).
+let correlationId = '<CORRELATION_ID>';
+Cas26Service_CL
+| where TimeGenerated > ago(2h)
+| where CorrelationId == correlationId
+| project TimeGenerated, OrderNumber, Cloud, Component, Stage, Success, DurationMs, FailureMode, Origin, DemoTag, Computer
+| order by TimeGenerated asc

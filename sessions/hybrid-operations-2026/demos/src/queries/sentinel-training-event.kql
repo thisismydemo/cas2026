@@ -1,0 +1,7 @@
+// Sentinel training rule query. Matches only the explicit CAS26Demo marker written by
+// Write-Cas26Event.ps1 -Message 'CAS26 Sentinel training'. It exercises the detection-to-incident
+// pipeline; it is not a detection of malicious activity.
+Event
+| where Source == "CAS26Demo" and EventID == 2601
+| where RenderedDescription has "CAS26 Sentinel training"
+| project TimeGenerated, Computer, RenderedDescription

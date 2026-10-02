@@ -1,0 +1,8 @@
+// Log Analytics in the Sentinel-enabled workspace. Latest snapshot per incident.
+SecurityIncident
+| where TimeGenerated > ago(24h)
+| summarize arg_max(TimeGenerated, *) by IncidentName
+| where Title startswith 'CAS26 TRAINING'
+| project IncidentNumber, IncidentName, Title, Severity, Status, Owner,
+    CreatedTime, LastModifiedTime, TimeGenerated
+| order by TimeGenerated desc

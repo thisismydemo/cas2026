@@ -1,0 +1,4 @@
+{"DataType":"Perf","BillableGB":12.378}
+{"DataType":"Syslog","BillableGB":8.049}
+{"DataType":"Heartbeat","BillableGB":0.642}
+{"DataType":"Cas26Service_CL","BillableGB":0.117}

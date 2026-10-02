@@ -1,0 +1,14 @@
+// Log Analytics. IIC Hybrid Orders stage records; schema in lab/design/HYBRID-APPLICATION-HEALTH-DESIGN.md (Telemetry contract).
+// One order writes one row per stage per cloud. Summarize by CorrelationId before counting orders.
+Cas26Service_CL
+| where TimeGenerated > ago(30m)
+| where Customer == 'IIC' and Environment == 'Production'
+| summarize Completed=countif(Component == 'Coordinator' and Stage == 'Completed' and Success == true),
+            Failed=countif(Success == false),
+            SlowestStageMs=max(DurationMs),
+            Clouds=make_set(Cloud),
+            LastSeen=max(TimeGenerated) by CorrelationId
+| extend Outcome=case(Failed > 0, 'Failed', Completed > 0, 'Completed', 'Unresolved')
+| summarize Orders=count(), CompletedOrders=countif(Outcome == 'Completed'), FailedOrders=countif(Outcome == 'Failed'),
+            Unresolved=countif(Outcome == 'Unresolved'), LastSeen=max(LastSeen)
+| extend FailurePercent=iff(Orders == 0, real(null), 100.0 * FailedOrders / Orders), EvidenceAge=now() - LastSeen

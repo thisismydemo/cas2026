@@ -1,0 +1,11 @@
+// Azure Resource Graph. Select exact resource and assignment IDs.
+// Policy state is asynchronous. Check timestamp after a change.
+PolicyResources
+| where type =~ 'microsoft.policyinsights/policystates'
+| where tostring(properties.resourceId) =~ 'REPLACE_WITH_FULL_ARC_SERVER_RESOURCE_ID'
+| where tostring(properties.policyAssignmentId) =~ 'REPLACE_WITH_FULL_POLICY_ASSIGNMENT_RESOURCE_ID'
+| project ResourceId=tostring(properties.resourceId),
+    AssignmentId=tostring(properties.policyAssignmentId),
+    DefinitionId=tostring(properties.policyDefinitionId),
+    Compliance=tostring(properties.complianceState),
+    EvaluatedAt=todatetime(properties.timestamp)

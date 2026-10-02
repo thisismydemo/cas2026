@@ -1,0 +1,8 @@
+// Resource-centric alert used as the noise example in M-D06: returns one row per machine's average CPU;
+// the alert rule's own condition (not this query) supplies the threshold. Regardless of whether any
+// customer order was affected. Covers on-premises and AWS.
+Perf
+| where TimeGenerated > ago(5m)
+| where Computer startswith 'cas26-' or Computer startswith 'iic-' or Computer startswith 'tplabs-01-'
+| where ObjectName == 'Processor' and CounterName == '% Processor Time' and InstanceName in ('_Total', 'total', '*')
+| summarize AvgCpuPercent = avg(CounterValue) by Computer

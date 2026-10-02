@@ -1,0 +1,18 @@
+// Health Models signal telemetry-coverage (value column Samples): how many orders left stage records in the window.
+// Coverage, not availability: it pairs with health-failure.kql so that silence is visible instead of read as success.
+// Telemetry contract (lab/design/HYBRID-APPLICATION-HEALTH-DESIGN.md): an order is Completed only when
+// Component=Coordinator, Stage=Completed, Success=true, with no Success=false row.
+// No stage records in the window returns no row, so the signal is Unknown (not Unhealthy with Samples=0).
+Cas26Service_CL
+| where TimeGenerated > ago(5m)
+| extend CorrelationId=tostring(column_ifexists('CorrelationId', '')),
+         Component=tostring(column_ifexists('Component', '')),
+         Stage=tostring(column_ifexists('Stage', ''))
+| where isnotempty(CorrelationId)
+| summarize FailedRows=countif(Success == false),
+            CoordinatorCompleted=countif(Component == 'Coordinator' and Stage == 'Completed' and Success == true),
+            LastSeen=max(TimeGenerated)
+    by CorrelationId
+| summarize Samples=count(), CompletedSamples=countif(CoordinatorCompleted > 0 and FailedRows == 0), LastSeen=max(LastSeen)
+| where Samples > 0
+| extend CompletedPercent=100.0 * CompletedSamples / Samples

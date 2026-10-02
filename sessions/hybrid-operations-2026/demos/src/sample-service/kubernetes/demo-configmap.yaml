@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cas26-demo
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cas26-operating-contract
+  namespace: cas26-demo
+  labels:
+    app.kubernetes.io/part-of: cas26
+data:
+  owner: hybrid-operations
+  change-boundary: dedicated-demo-namespace
+  expected-state: reconciled-by-azure-arc-flux

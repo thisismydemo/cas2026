@@ -1,0 +1,6 @@
+// Log Analytics. No result means missing evidence, not proof of stopped machine.
+let machineId = 'REPLACE_WITH_FULL_ARC_SERVER_RESOURCE_ID';
+Heartbeat
+| where TimeGenerated > ago(30m) and _ResourceId =~ machineId
+| summarize LastSeen=max(TimeGenerated), Samples=count() by Computer, _ResourceId
+| extend EvidenceAge=now()-LastSeen

@@ -1,0 +1,88 @@
+===== second-opinion =====
+[second-opinion -> deepseek-v4-pro | 21.7s | in 9404 / out 1411 tokens]
+
+Based on the provided content, here are the maximum of 8 actionable findings.
+
+1.  **Finding**: Demonstration H26 uses `az k8s-configuration flux create` with `prune=true` and a manifest that includes a `Namespace`. Deleting the Flux configuration will delete the namespace and all objects within it, creating a potential data loss risk.
+    *   **Demo ID**: H26
+    *   **Exact Command/Claim**: The step text states, "Because the Git manifest includes the Namespace and prune=true, deleting the configuration can remove that namespace and everything within it."
+    *   **Correction**: The "reset" guidance for H26 provides a detailed procedure to mitigate this. It mandates inspecting "all namespaced resource kinds and ownership first; refuse cleanup if anything unrelated exists or inspection is incomplete" before executing a delete.
+    *   **Source/Uncertainty**: The reset procedure in the content explicitly addresses this risk; the finding confirms the procedure is necessary.
+
+2.  **Finding**: In demonstration H16, request outcome tracking may be inaccurate if telemetry from different hosts is combined.
+    *   **Demo ID**: H16
+    *   **Exact Command/Claim**: The step text warns, "Explain that each Computer row is a component perspective and do not combine them into a false end-to-end request count."
+    *   **Correction**: The step correctly instructs to filter KQL by computer and treat each row as a component perspective, preventing a false aggregated report.
+    *   **Source/Uncertainty**: The correction is directly within the step's 'expected' guidance in the content. The uncertainty is the complexity of correlating logs from multiple components without a shared trace ID.
+
+3.  **Finding**: The `az policy remediation create` command in H23 uses a `--resource` parameter that appears to accept a full resource ID, but the document's header specifies `--resource FULL_ID`.
+    *   **Demo ID**: H23
+    *   **Exact Command/Claim**: Header: "Current Microsoft docs support az policy remediation create --resource FULL_ID --policy-assignment FULL_ID." The step command: `az policy remediation create --resource $TargetId --policy-assignment $AssignmentId ...` where `$TargetId` is a full resource ID.
+    *   **Correction**: None required. The finding is a confirmation that the command used (`--resource $TargetId`) aligns with the documented claim that it accepts a full ID.
+    *   **Source/Uncertainty**: The content's own header confirms this command usage is supported by Microsoft. Validation of this detail against specific API versions is the source of initial uncertainty.
+
+4.  **Finding**: The Policy definition in H23 and H24 applies a default Owner tag of "unassigned" when the tag is absent, a state easily mistaken for a real owner.
+    *   **Demo ID**: H23, H24
+    *   **Exact Command/Claim**: Step text: "The repository policy adds an absent Owner tag; it does not repair empty/wrong values. The default is deliberately unassigned-like, not proof of an accountable owner."
+    *   **Correction**: The demonstration steps explicitly warn that the "unassigned" value is a placeholder and does not signify human accountability, preventing the audience from conflating it with a resolved ownership assignment.
+    *   **Source/Uncertainty**: The clarification is from the step's 'body' in the content. The risk is that this nuance is missed during the live demo.
+
+5.  **Finding**: In H19, the "reset" guidance distinguishes removing a tag from removing a role assignment, which could be confused with RBAC role management.
+    *   **Demo ID**: H19
+    *   **Exact Command/Claim**: Reset text: "Restore only the reserved tag from the recorded baseline... Remove temporary CAS26 role assignments only if separately created..."
+    *   **Correction**: The reset procedure creates a clear distinction by referring to restoring a "tag" and only removing "role assignments" under a separate, verified condition. This avoids conflating the Tag Owner property with an RBAC role.
+    *   **Source/Uncertainty**: The content's header explicitly warns, "Don't conflate Owner TAG with RBAC role." The reset steps are the practical implementation of this guidance.
+
+6.  **Finding**: The demonstration H20C relies on deriving the Log Analytics workspace for KQL queries, which may differ from the Sentinel workspace's resource ID.
+    *   **Demo ID**: H20C
+    *   **Exact Command/Claim**: Step text: "The ARM workspace ID establishes resource scope; the workspace GUID is used for the KQL CLI." The command uses `$Demo.LogAnalyticsWorkspaceId`.
+    *   **Correction**: The steps correctly identify the different IDs, using the ARM resource ID (`$Demo.SentinelWorkspaceResourceId`) for scope and the Log Analytics workspace GUID (`$Demo.LogAnalyticsWorkspaceId`) for CLI queries, aligning with the header's note about "customerId derivation".
+    *   **Source/Uncertainty**: The header notes this derivation is an area of "known corrections actively underway," but the step's approach is functionally correct for demo purposes.
+
+7.  **Finding**: A failed HTTP request in H23B could be suppressed without inspecting the body, leading to the loss of a correlation ID.
+    *   **Demo ID**: H23B
+    *   **Exact Command/Claim**: The step text uses `Invoke-WebRequest` with `-SkipHttpErrorCheck` but then explicitly instructs to output `$failed.StatusCode` and `$failed.Content`.
+    *   **Correction**: The step's explicit command to output both StatusCode and Content ensures that the full response, including any correlation IDs, is visible even for an error, preventing hidden evidence.
+    *   **Source/Uncertainty**: The correction is the explicit `.StatusCode` and `.Content` calls in the command block, per the provided content.
+
+8.  **Finding**: The `az policy state list` command in H23 queries for policy compliance, but its results may be stale or delayed compared to the remediation task completion.
+    *   **Demo ID**: H23
+    *   **Exact Command/Claim**: Step text warns: "Do not announce fresh compliance until the timestamp supports it."
+    *   **Correction**: The step correctly guides the presenter to check the `timestamp` of the compliance state and not interpret a policy evaluation as an immediate confirmation of the completed remediation task.
+    *   **Source/Uncertainty**: The expected outcome text explicitly provides this correction. The uncertainty lies in the delay of the Azure Policy evaluation cycle.
+
+===== adversary =====
+[adversary -> grok-4-20-reasoning | 21.2s | in 8936 / out 675 tokens]
+
+**Actionable Findings (4)**
+
+**Finding 1**  
+**Demo IDs:** H20C  
+**Exact command/claim:** `az resource show --ids $Demo.SentinelWorkspaceResourceId` (step 1) followed by `az monitor log-analytics query --workspace $Demo.LogAnalyticsWorkspaceId` (step 3). Claims the displayed workspace matches the shared environment.  
+**Correction:** Standardize on a single variable or correctly derive the Log Analytics workspace ID/customerId from the Sentinel workspace resource ID.  
+**Source:** Direct variable mismatch in H20C "Identify workspace and training scope" and query step. (Known correction for Sentinel workspace customerId derivation is actively underway.)  
+**Confidence:** 80
+
+**Finding 2**  
+**Demo IDs:** H16, H23B  
+**Exact command/claim:** KQL query `Cas26Service_CL | where TimeGenerated > ago(30m) | where Service == 'cas26-requests' | summarize ... by Computer` (H16 step 5 and H23B equivalent steps) combined with repeated `Invoke-RestMethod .../request` calls. Presents counts/FailurePercent by Computer only.  
+**Correction:** Implement endpoint+RequestId deduplication in both the telemetry pipeline and the KQL queries.  
+**Source:** H16 "Read request outcomes and their freshness" query and H23B steps 3/5/6. (Explicitly listed as known correction actively underway.)  
+**Confidence:** 85
+
+**Finding 3**  
+**Demo IDs:** H07B, H11, H19, H23, H24, H26 (all PowerShell-wrapped az sequences)  
+**Exact command/claim:** Long chains of `az ...` commands (e.g. `az policy remediation create`, `az k8s-configuration flux create`, `az resource show`, etc.) with no `$LASTEXITCODE` checks or equivalent.  
+**Correction:** Add native CLI exit code validation after each `az` invocation.  
+**Source:** Consistent pattern across all listed demos. (Explicitly listed as known correction actively underway.)  
+**Confidence:** 75
+
+**Finding 4**  
+**Demo IDs:** H23, H24  
+**Exact command/claim:** `az policy remediation create --resource $TargetId --policy-assignment $AssignmentId --name $RemediationName --resource-discovery-mode ExistingNonCompliant` plus repeated statements that the governance module "adds an absent Owner tag only" and that the default is "deliberately unassigned-like, not proof of an accountable owner."  
+**Correction:** The command is now supported by current Microsoft docs (resource + assignment full IDs). No change required to the command or the Owner-tag vs RBAC clarification text; both are already correct.  
+**Source:** H23/H24 steps 4–6 and reset guidance. Matches provided governance module behavior and current `az policy remediation create` documentation.  
+**Confidence:** 90
+
+**Summary**  
+Only these four findings are directly supported by the supplied content. No other defects were identified when restricting review strictly to the JSON. The Flux prune warning in H26, the Owner-tag vs RBAC separation in H19/H23/H24, and the remediation command syntax are already aligned with the supplied guidance.
